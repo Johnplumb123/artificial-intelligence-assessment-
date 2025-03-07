@@ -52,6 +52,11 @@ class PuzzleWorld(World):
         # A plan
         self.plan = [[Directions.NORTH, 0, 0], [0, Directions.NORTH, 0], [0, 0, Directions.NORTH]]
 
+        # Initialize DFS attributes
+        self.visited = set()  # To track visited states
+        self.stack = []       # To implement DFS
+        self.path = []        # To store the current path
+
     #
     # Methods
     #
@@ -73,12 +78,38 @@ class PuzzleWorld(World):
     # This is where you should start writing your solution to the
     # puzle problem.
     def makeAMove(self, goal):
-        if self.plan:
-            move = self.plan.pop()
-            print(move)
-            self.takeStep(move)
-        else:
-            print("Nothing to do!")
+        # If no plan, initialize DFS
+        if not self.plan:
+            if not self.stack:
+                self.stack.append((self.lLoc, self.wLoc, []))  # (link_pos, wumpus_pos, path)
+
+            # Perform DFS
+            while self.stack:
+                link_pos, wumpus_pos, path = self.stack.pop()
+                if self.isSolved(goal):
+                    return
+
+                state_key = (link_pos.x, link_pos.y, tuple((w.x, w.y) for w in wumpus_pos))
+                if state_key not in self.visited:
+                    self.visited.add(state_key)
+                    # Generate valid moves for Link and Wumpus
+                    link_moves = self.getNeighbors(link_pos)
+                    wumpus_moves = [self.getNeighbors(w) for w in wumpus_pos]
+                    for l_move in link_moves:
+                        for w_move in wumpus_moves[0]:  # Assuming one Wumpus for simplicity
+                            if self.isValid(l_move) and self.isValid(w_move):
+                                new_link_pos = Pose(l_move[0], l_move[1])
+                                new_wumpus_pos = [Pose(w_move[0], w_move[1])]
+                                self.stack.append((new_link_pos, new_wumpus_pos, path + [[l_move, w_move]]))
+
+            # If no plan is found, stay in place
+            print("No plan found!")
+            return
+
+        # Execute the plan
+        move = self.plan.pop()
+        print(move)
+        self.takeStep(move)
 
     # A move is a list of the directions that [Link, Wumpus1, Wumpus2,
     # ...] move in.  takeStep decodes these and makes the relevant
@@ -129,4 +160,20 @@ class PuzzleWorld(World):
                         if self.wLoc[j].x > 0:
                             self.wLoc[j].x = self.wLoc[j].x - 1
 
+    def getNeighbors(self, position):
+        x, y = position.x, position.y
+        neighbors = []
+        # Check all four directions
+        if x > 0:
+            neighbors.append((x - 1, y))  # WEST
+        if x < self.maxX:
+            neighbors.append((x + 1, y))  # EAST
+        if y > 0:
+            neighbors.append((x, y - 1))  # SOUTH
+        if y < self.maxY:
+            neighbors.append((x, y + 1))  # NORTH
+        return neighbors
 
+    def isValid(self, position):
+        x, y = position
+        return 0 <= x <= self.maxX and 0 <= y <= self.maxY
